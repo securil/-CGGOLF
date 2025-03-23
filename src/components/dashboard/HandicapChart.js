@@ -28,23 +28,39 @@ const HandicapChart = ({ userData }) => {
   const [isDataAvailable, setIsDataAvailable] = useState(false);
 
   useEffect(() => {
-    if (!userData || !userData.handicapHistory || userData.handicapHistory.length === 0) {
+    if (!userData || !userData.records || Object.keys(userData.records).length === 0) {
       setIsDataAvailable(false);
       return;
     }
 
-    // 날짜로 정렬
-    const sortedHistory = [...userData.handicapHistory].sort((a, b) => 
-      new Date(a.date) - new Date(b.date)
-    );
-
-    // 차트 데이터 가공
-    const labels = sortedHistory.map(record => {
-      const date = new Date(record.date);
-      return `${date.getFullYear()}.${date.getMonth() + 1}`;
+    // 핸디캡 데이터 수집
+    const handicapData = [];
+    
+    // 연도별 핸디캡 데이터 추출
+    Object.entries(userData.records).forEach(([year, yearData]) => {
+      if (yearData.handicap) {
+        // 각 연도의 마지막 날을 날짜로 설정
+        const date = new Date(parseInt(year), 11, 31);
+        
+        handicapData.push({
+          date,
+          handicap: yearData.handicap,
+          year
+        });
+      }
     });
+    
+    // 날짜순으로 정렬
+    handicapData.sort((a, b) => a.date - b.date);
+    
+    if (handicapData.length === 0) {
+      setIsDataAvailable(false);
+      return;
+    }
 
-    const handicaps = sortedHistory.map(record => record.handicap);
+    // 차트 데이터 구성
+    const labels = handicapData.map(item => item.year);
+    const handicaps = handicapData.map(item => item.handicap);
 
     const data = {
       labels,
@@ -61,46 +77,6 @@ const HandicapChart = ({ userData }) => {
 
     setChartData(data);
     setIsDataAvailable(true);
-  }, [userData]);
-
-  // 핸디캡 데이터가 없는 경우 임시 데이터 생성
-  useEffect(() => {
-    if (!userData || userData.handicapHistory) return;
-    
-    // 점수 데이터가 있으면 임시 핸디캡 히스토리 생성
-    if (userData.scores && userData.scores.length > 0) {
-      const sortedScores = [...userData.scores].sort((a, b) => 
-        new Date(a.date) - new Date(b.date)
-      );
-      
-      // 간단한 핸디캡 계산 (실제로는 더 복잡한 공식 사용)
-      const handicapHistory = sortedScores.map(score => {
-        const handicap = ((score.score - 72) * 0.8).toFixed(1);
-        return {
-          date: score.date,
-          handicap: Math.max(0, handicap) // 최소 0
-        };
-      });
-      
-      const data = {
-        labels: handicapHistory.map(record => {
-          const date = new Date(record.date);
-          return `${date.getFullYear()}.${date.getMonth() + 1}`;
-        }),
-        datasets: [
-          {
-            label: '핸디캡 (추정)',
-            data: handicapHistory.map(record => record.handicap),
-            borderColor: 'rgb(245, 158, 11)',
-            backgroundColor: 'rgba(245, 158, 11, 0.5)',
-            tension: 0.1
-          }
-        ]
-      };
-      
-      setChartData(data);
-      setIsDataAvailable(true);
-    }
   }, [userData]);
 
   const options = {
