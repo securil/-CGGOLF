@@ -1,83 +1,62 @@
-import React, { useEffect } from 'react';
-import { Routes, Route, useLocation } from 'react-router-dom';
-import { useAuth } from './context/AuthContext';
+// src/App.js
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
 
-// 페이지 컴포넌트 
+// 페이지 컴포넌트 임포트
 import Home from './pages/Home';
 import Login from './pages/Login';
 import UserDashboard from './pages/UserDashboard';
-import AdminDashboard from './pages/AdminDashboard';
-import Registration from './pages/Registration';
-
-// 공통 컴포넌트
 import Header from './components/common/Header';
 import Footer from './components/common/Footer';
 
+// 보호된 라우트 컴포넌트
+const ProtectedRoute = ({ children }) => {
+  const { isAuthenticated, loading } = useAuth();
+  
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-500"></div>
+      </div>
+    );
+  }
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  return children;
+};
+
 function App() {
-  const location = useLocation();
-  const { isAuthenticated, isAdmin } = useAuth();
-
-  // 페이지 이동시 최상단으로 스크롤
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [location.pathname]);
-
-  // 스크롤 애니메이션 적용
-  useEffect(() => {
-    // 요소가 보이는지 확인하는 함수
-    const reveal = () => {
-      const reveals = document.querySelectorAll('.reveal');
-      
-      for (let i = 0; i < reveals.length; i++) {
-        const windowHeight = window.innerHeight;
-        const elementTop = reveals[i].getBoundingClientRect().top;
-        const elementVisible = 150;
-        
-        if (elementTop < windowHeight - elementVisible) {
-          reveals[i].classList.add('active');
-        } else {
-          reveals[i].classList.remove('active');
-        }
-      }
-    };
-
-    window.addEventListener('scroll', reveal);
-    // 초기 실행
-    reveal();
-    
-    // 클린업
-    return () => {
-      window.removeEventListener('scroll', reveal);
-    };
-  }, []);
+  // GitHub Pages 배포를 위한 basename 설정
+  const basename = process.env.PUBLIC_URL;
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header />
-      <main className="flex-grow">
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          
-          {/* 인증된 사용자만 접근 가능한 라우트 */}
-          {isAuthenticated && (
-            <>
-              <Route path="/dashboard" element={<UserDashboard />} />
-              <Route path="/registration" element={<Registration />} />
-            </>
-          )}
-          
-          {/* 관리자만 접근 가능한 라우트 */}
-          {isAdmin && (
-            <Route path="/admin" element={<AdminDashboard />} />
-          )}
-          
-          {/* 없는 페이지는 홈으로 리다이렉트 */}
-          <Route path="*" element={<Home />} />
-        </Routes>
-      </main>
-      <Footer />
-    </div>
+    <AuthProvider>
+      <Router basename={basename}>
+        <div className="flex flex-col min-h-screen">
+          <Header />
+          <main className="flex-grow">
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/login" element={<Login />} />
+              <Route 
+                path="/dashboard" 
+                element={
+                  <ProtectedRoute>
+                    <UserDashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </main>
+          <Footer />
+        </div>
+      </Router>
+    </AuthProvider>
   );
 }
 
