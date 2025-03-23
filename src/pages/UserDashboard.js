@@ -17,6 +17,7 @@ const UserDashboard = () => {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [allMembersData, setAllMembersData] = useState([]);
   
   // 인증 상태 확인 및 리다이렉트
   useEffect(() => {
@@ -31,9 +32,12 @@ const UserDashboard = () => {
       if (!currentUser) return;
       
       try {
-        // 실제 구현 시 API 호출로 대체
+        // 회원 데이터 로드
         const response = await fetch(`${process.env.PUBLIC_URL}/data/members.json`);
         const data = await response.json();
+        
+        // 모든 회원 데이터 저장 (비교 차트용)
+        setAllMembersData(data.members);
         
         // 현재 로그인한 사용자의 데이터 찾기
         const userDetails = data.members.find(member => member.name === currentUser.name);
@@ -120,7 +124,7 @@ const UserDashboard = () => {
           {/* 평균 비교 차트 */}
           <div className="bg-white shadow rounded-lg p-4 mt-6">
             <h2 className="text-xl font-semibold mb-4 text-navy-600">전체 평균과 비교</h2>
-            <ComparisonChart userData={userData} />
+            <ComparisonChart userData={userData} allMembersData={allMembersData} />
           </div>
         </div>
       </div>
