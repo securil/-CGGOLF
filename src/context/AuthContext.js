@@ -1,3 +1,6 @@
+// src/context/AuthContext.js 업데이트
+// 기존 members.json 구조에 맞게 로그인 로직 수정
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext();
@@ -27,7 +30,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // 로그인 처리
-  const login = (name, phone) => {
+  const login = async (name, phone) => {
     // 관리자 로그인
     if (name === 'admin' && phone === '132400admin') {
       const adminUser = {
@@ -43,37 +46,44 @@ export const AuthProvider = ({ children }) => {
       return true;
     }
     
-    // 일반 회원 로그인 (회원 데이터를 fetch해서 비교하는 로직 필요)
-    // 지금은 테스트를 위해 간단히 회원 찾는 로직만 구현
-    return fetch('/data/members.json')
-      .then(response => response.json())
-      .then(data => {
-        const lastFourDigits = phone.slice(-4);
-        const user = data.members.find(
-          member => member.name === name && member.phone.slice(-4) === lastFourDigits
-        );
+    // 일반 회원 로그인
+    try {
+      const response = await fetch(`${process.env.PUBLIC_URL}/data/members.json`);
+      const data = await response.json();
+      
+      // 전화번호 뒷자리 추출 및 비교
+      // 현재 JSON 구조는 "010-0000-0000" 형식이므로 마지막 4자리 추출
+      let lastFourDigits = phone;
+      // 이미 4자리만 입력한 경우와 전체 번호를 입력한 경우 모두 처리
+      if (phone.length > 4) {
+        lastFourDigits = phone.replace(/-/g, '').slice(-4);
+      }
+      
+      const user = data.members.find(
+        member => member.name === name && 
+        (member.phone.replace(/-/g, '').slice(-4) === lastFourDigits || member.phone === phone)
+      );
+      
+      if (user) {
+        const userData = {
+          name: user.name,
+          cohort: user.cohort,
+          isAdmin: false
+        };
         
-        if (user) {
-          const userData = {
-            name: user.name,
-            cohort: user.cohort,
-            isAdmin: false
-          };
-          
-          localStorage.setItem('currentUser', JSON.stringify(userData));
-          setCurrentUser(userData);
-          setIsAuthenticated(true);
-          setIsAdmin(false);
-          
-          return true;
-        }
+        localStorage.setItem('currentUser', JSON.stringify(userData));
+        setCurrentUser(userData);
+        setIsAuthenticated(true);
+        setIsAdmin(false);
         
-        return false;
-      })
-      .catch(error => {
-        console.error('로그인 에러:', error);
-        return false;
-      });
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('로그인 에러:', error);
+      return false;
+    }
   };
 
   // 로그아웃 처리
