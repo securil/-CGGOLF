@@ -8,35 +8,39 @@ const ScoreTable = ({ userData }) => {
   const recordsPerPage = 10;
 
   useEffect(() => {
-    if (!userData || !userData.scores) {
+    if (!userData || !userData.records) {
       setScores([]);
       return;
     }
 
-    // 점수 데이터 복사
-    let sortedScores = [...userData.scores];
+    // 모든 기록 데이터 수집
+    const allScores = [];
+    
+    // 연도별, 월별 스코어 데이터 추출
+    Object.entries(userData.records).forEach(([year, yearData]) => {
+      if (yearData.scores) {
+        Object.entries(yearData.scores).forEach(([month, score]) => {
+          const monthNum = getMonthNumber(month);
+          // 각 월의 15일로 날짜 설정 (월의 중간일)
+          const date = new Date(parseInt(year), monthNum - 1, 15);
+          
+          allScores.push({
+            date,
+            dateStr: `${year}년 ${month}`,
+            score,
+            year,
+            month,
+            course: '-', // 코스 정보가 없으므로 기본값 설정
+            notes: '월례회'
+          });
+        });
+      }
+    });
     
     // 정렬 적용
-    sortedScores.sort((a, b) => {
-      if (sortConfig.key === 'date') {
-        const dateA = new Date(a.date);
-        const dateB = new Date(b.date);
-        return sortConfig.direction === 'asc' ? dateA - dateB : dateB - dateA;
-      } else if (sortConfig.key === 'score') {
-        return sortConfig.direction === 'asc' 
-          ? a.score - b.score 
-          : b.score - a.score;
-      } else if (sortConfig.key === 'course') {
-        const courseA = a.course || '';
-        const courseB = b.course || '';
-        return sortConfig.direction === 'asc'
-          ? courseA.localeCompare(courseB)
-          : courseB.localeCompare(courseA);
-      }
-      return 0;
-    });
-
-    setScores(sortedScores);
+    applySort(allScores, sortConfig);
+    
+    setScores(allScores);
   }, [userData, sortConfig]);
 
   // 정렬 처리
@@ -46,6 +50,27 @@ const ScoreTable = ({ userData }) => {
       direction = 'desc';
     }
     setSortConfig({ key, direction });
+  };
+
+  // 배열에 정렬 적용
+  const applySort = (array, config) => {
+    array.sort((a, b) => {
+      if (config.key === 'date') {
+        return config.direction === 'asc' 
+          ? a.date - b.date 
+          : b.date - a.date;
+      } else if (config.key === 'score') {
+        return config.direction === 'asc' 
+          ? a.score - b.score 
+          : b.score - a.score;
+      } else if (config.key === 'year') {
+        return config.direction === 'asc' 
+          ? a.year.localeCompare(b.year)
+          : b.year.localeCompare(a.year);
+      }
+      return 0;
+    });
+    return array;
   };
 
   // 정렬 방향에 따른 화살표 표시
@@ -63,7 +88,7 @@ const ScoreTable = ({ userData }) => {
   // 페이지 변경 핸들러
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
-  if (!userData || !userData.scores || userData.scores.length === 0) {
+  if (!userData || !userData.records || scores.length === 0) {
     return (
       <div className="bg-white p-6 rounded-lg shadow">
         <p className="text-center text-gray-500">기록이 없습니다.</p>
@@ -87,9 +112,9 @@ const ScoreTable = ({ userData }) => {
               <th 
                 scope="col" 
                 className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                onClick={() => requestSort('course')}
+                onClick={() => requestSort('year')}
               >
-                코스{getSortDirectionArrow('course')}
+                연도{getSortDirectionArrow('year')}
               </th>
               <th 
                 scope="col" 
@@ -108,18 +133,18 @@ const ScoreTable = ({ userData }) => {
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {currentRecords.map((score, index) => (
-              <tr key={`${score.date}-${index}`}>
+              <tr key={`${score.year}-${score.month}-${index}`}>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {new Date(score.date).toLocaleDateString('ko-KR')}
+                  {score.dateStr}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {score.course || '-'}
+                  {score.year}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {score.score}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {score.notes || '-'}
+                  {score.notes}
                 </td>
               </tr>
             ))}
@@ -233,6 +258,16 @@ const ScoreTable = ({ userData }) => {
       )}
     </div>
   );
+};
+
+// 월 이름을 숫자로 변환하는 함수
+const getMonthNumber = (monthName) => {
+  const monthMap = {
+    '1월': 1, '2월': 2, '3월': 3, '4월': 4, '5월': 5, '6월': 6,
+    '7월': 7, '8월': 8, '9월': 9, '10월': 10, '11월': 11, '12월': 12
+  };
+  
+  return monthMap[monthName] || 0;
 };
 
 export default ScoreTable;
