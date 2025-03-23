@@ -10,37 +10,62 @@ const ParticipationHeatmap = ({ userData }) => {
   const [endDate, setEndDate] = useState(new Date());
 
   useEffect(() => {
-    if (!userData || !userData.scores || userData.scores.length === 0) {
+    if (!userData || !userData.records) {
       return;
     }
 
-    // 모든 참여 날짜를 Date 객체로 변환하고 정렬
-    const participationDates = userData.scores
-      .map(score => new Date(score.date))
-      .sort((a, b) => a - b);
+    const participationDates = [];
+    
+    // 모든 연도와 월의 참여 데이터 추출
+    Object.entries(userData.records).forEach(([year, yearData]) => {
+      if (yearData.scores) {
+        Object.entries(yearData.scores).forEach(([month, score]) => {
+          const monthNum = getMonthNumber(month);
+          // 각 월의 15일로 날짜 설정 (월의 중간일)
+          const date = new Date(parseInt(year), monthNum - 1, 15);
+          
+          participationDates.push({
+            date,
+            count: 1,
+            score,
+            month,
+            year
+          });
+        });
+      }
+    });
+    
+    // 날짜순으로 정렬
+    participationDates.sort((a, b) => a.date - b.date);
+    
+    if (participationDates.length === 0) {
+      return;
+    }
 
-    // 시작 날짜 (가장 오래된 참여일로부터 1년 전)
-    const firstDate = new Date(participationDates[0]);
+    // 날짜 범위 설정
+    // 가장 오래된 참여일로부터 1년 전
+    const firstDate = new Date(participationDates[0].date);
     firstDate.setFullYear(firstDate.getFullYear() - 1);
     setStartDate(firstDate);
 
-    // 종료 날짜 (현재 날짜 또는 가장 최근 참여일로부터 1개월 후)
-    const lastDate = new Date(participationDates[participationDates.length - 1]);
+    // 가장 최근 참여일로부터 1개월 후 또는 현재 날짜
+    const lastDate = new Date(participationDates[participationDates.length - 1].date);
     lastDate.setMonth(lastDate.getMonth() + 1);
     const today = new Date();
     setEndDate(lastDate > today ? lastDate : today);
 
-    // 참여일별로 스코어 및 코스 정보를 데이터 포인트로 변환
-    const data = userData.scores.map(score => {
+    // 히트맵 데이터 형식으로 변환
+    const heatmapItems = participationDates.map(item => {
       return {
-        date: score.date,
-        count: 1, // 참여 횟수
-        score: score.score,
-        course: score.course || '코스 정보 없음'
+        date: formatDate(item.date), // ISO 형식으로 변환
+        count: 1,
+        score: item.score,
+        month: item.month,
+        year: item.year
       };
     });
 
-    setHeatmapData(data);
+    setHeatmapData(heatmapItems);
   }, [userData]);
 
   // 툴팁에 표시할 내용
@@ -49,15 +74,8 @@ const ParticipationHeatmap = ({ userData }) => {
       return { 'data-tip': '참여 기록 없음' };
     }
     
-    const date = new Date(value.date);
-    const dateStr = date.toLocaleDateString('ko-KR', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    });
-    
     return {
-      'data-tip': `${dateStr} - ${value.course} (${value.score}타)`
+      'data-tip': `${value.year}년 ${value.month} - ${value.score}타`
     };
   };
 
@@ -69,7 +87,7 @@ const ParticipationHeatmap = ({ userData }) => {
     return 'color-filled';
   };
 
-  if (!userData || !userData.scores || userData.scores.length === 0) {
+  if (!userData || !userData.records || Object.keys(userData.records).length === 0) {
     return (
       <div className="flex justify-center items-center h-64 bg-gray-50 rounded">
         <p className="text-gray-500">참여 기록이 없습니다.</p>
@@ -106,6 +124,21 @@ const ParticipationHeatmap = ({ userData }) => {
       </div>
     </div>
   );
+};
+
+// 월 이름을 숫자로 변환하는 함수
+const getMonthNumber = (monthName) => {
+  const monthMap = {
+    '1월': 1, '2월': 2, '3월': 3, '4월': 4, '5월': 5, '6월': 6,
+    '7월': 7, '8월': 8, '9월': 9, '10월': 10, '11월': 11, '12월': 12
+  };
+  
+  return monthMap[monthName] || 0;
+};
+
+// 날짜를 'YYYY-MM-DD' 형식의 문자열로 변환
+const formatDate = (date) => {
+  return date.toISOString().split('T')[0];
 };
 
 export default ParticipationHeatmap;
