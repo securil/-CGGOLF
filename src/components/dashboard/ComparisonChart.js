@@ -21,97 +21,64 @@ ChartJS.register(
   Legend
 );
 
-const ComparisonChart = ({ userData }) => {
+const ComparisonChart = ({ userData, allMembersData }) => {
   const [chartData, setChartData] = useState({ labels: [], datasets: [] });
   const [isDataAvailable, setIsDataAvailable] = useState(false);
-  const [averageData, setAverageData] = useState(null);
 
-  // 전체 회원 평균 데이터 로드
   useEffect(() => {
-    const fetchAverageData = async () => {
-      try {
-        // 실제 구현 시 API 호출로 대체
-        const response = await fetch(`${process.env.PUBLIC_URL}/data/averages.json`);
-        const data = await response.json();
-        setAverageData(data);
-      } catch (err) {
-        console.error('평균 데이터 로드 에러:', err);
-        // 임시 평균 데이터 생성 (실제 구현 시 삭제)
-        setAverageData({
-          monthlyAverages: {
-            "2025-01": 85.2,
-            "2025-02": 84.8,
-            "2025-03": 84.5,
-            "2025-04": 83.9,
-            "2025-05": 83.6,
-            "2025-06": 83.2
-          }
-        });
-      }
-    };
-    
-    fetchAverageData();
-  }, []);
-
-  // 차트 데이터 준비
-  useEffect(() => {
-    if (!userData || !userData.scores || userData.scores.length === 0 || !averageData) {
+    if (!userData || !userData.records || Object.keys(userData.records).length === 0 || !allMembersData) {
       setIsDataAvailable(false);
       return;
     }
 
-    // 사용자의 최근 스코어 계산 (최근 6개월)
-    const lastSixMonths = [];
-    const today = new Date();
+    // 최근 3년 데이터만 사용
+    const currentYear = new Date().getFullYear();
+    const years = [currentYear, currentYear - 1, currentYear - 2].filter(year => 
+      userData.records[year] !== undefined
+    ).map(String);
     
-    for (let i = 0; i < 6; i++) {
-      const monthDate = new Date(today);
-      monthDate.setMonth(today.getMonth() - i);
-      const monthStr = `${monthDate.getFullYear()}-${(monthDate.getMonth() + 1).toString().padStart(2, '0')}`;
-      lastSixMonths.unshift(monthStr);
+    // 데이터가 없으면 종료
+    if (years.length === 0) {
+      setIsDataAvailable(false);
+      return;
     }
 
-    // 사용자의 월별 평균 스코어 계산
-    const userMonthlyScores = lastSixMonths.map(monthStr => {
-      const yearMonth = monthStr.split('-');
-      const year = parseInt(yearMonth[0]);
-      const month = parseInt(yearMonth[1]);
-      
-      const monthScores = userData.scores.filter(score => {
-        const scoreDate = new Date(score.date);
-        return scoreDate.getFullYear() === year && scoreDate.getMonth() + 1 === month;
-      });
-      
-      if (monthScores.length === 0) return null;
-      
-      const sum = monthScores.reduce((total, score) => total + score.score, 0);
-      return sum / monthScores.length;
+    // 사용자 데이터 계산
+    const userYearlyAverages = years.map(year => {
+      const yearData = userData.records[year];
+      return yearData && yearData.average_score ? yearData.average_score : null;
     });
 
-    // 전체 평균 스코어 추출
-    const groupAverages = lastSixMonths.map(monthStr => 
-      averageData.monthlyAverages[monthStr] || null
-    );
-
-    // 차트 레이블 (간단한 월 표시)
-    const labels = lastSixMonths.map(monthStr => {
-      const parts = monthStr.split('-');
-      return `${parts[1]}월`;
+    // 전체 평균 계산
+    const groupYearlyAverages = years.map(year => {
+      // 해당 연도에 기록이 있는 모든 회원 필터링
+      const membersWithData = allMembersData.filter(member => 
+        member.records && member.records[year] && member.records[year].average_score
+      );
+      
+      if (membersWithData.length === 0) return null;
+      
+      // 평균 계산
+      const sum = membersWithData.reduce((total, member) => 
+        total + member.records[year].average_score, 0
+      );
+      
+      return (sum / membersWithData.length).toFixed(1);
     });
 
     // 차트 데이터 구성
     const data = {
-      labels,
+      labels: years,
       datasets: [
         {
           label: '내 평균',
-          data: userMonthlyScores,
+          data: userYearlyAverages,
           backgroundColor: 'rgba(16, 185, 129, 0.7)', // emerald-500
           borderWidth: 1
         },
         {
           label: '전체 평균',
-          data: groupAverages,
+          data: groupYearlyAverages,
           backgroundColor: 'rgba(59, 130, 246, 0.7)', // blue-500
           borderWidth: 1
         }
@@ -120,7 +87,7 @@ const ComparisonChart = ({ userData }) => {
 
     setChartData(data);
     setIsDataAvailable(true);
-  }, [userData, averageData]);
+  }, [userData, allMembersData]);
 
   const options = {
     responsive: true,
@@ -133,7 +100,7 @@ const ComparisonChart = ({ userData }) => {
           label: function(context) {
             const label = context.dataset.label || '';
             const value = context.parsed.y;
-            return value ? `${label}: ${value.toFixed(1)}타` : `${label}: 데이터 없음`;
+            return value ? `${label}: ${value}타` : `${label}: 데이터 없음`;
           }
         }
       }
